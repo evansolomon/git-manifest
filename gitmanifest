@@ -22,13 +22,33 @@ def do_export():
         print "Entering '%s'" % relpath
 
         # Find remote
-        origin_data = os.popen('cd %s && git remote show origin' % root).read()
-        remote_url = re.search(r'Fetch URL: (\S+)', origin_data).group(1)
+        remote_url = _get_remote(root)
+        # Make sure we found a remote
+        if not remote_url:
+            print "Skipping %s because it doesn't have any remotes" % root
+            continue
 
-        data.append({'path': root, 'remote': remote_url})
+        data.append({'path': root, 'remote': _get_remote(root)})
 
     manifest = open('gitmanifest.json', 'w')
     manifest.write(json.dumps(data, indent=4))
+
+
+def _get_remote(path):
+    remotes = os.popen('cd %s && git remote -v' % path).read()
+    matches = re.findall(r'(\S+)\s+(\S+) \(fetch\)', remotes)
+
+    # Some repos don't have a remote
+    if not matches:
+        return False
+
+    # Use origin if it exists
+    for remote in matches:
+        if 'origin' == remote[0]:
+            return remote[1]  # The URL
+
+    # Otherwise just use the first one
+    return matches[0][1]
 
 
 def do_import():
