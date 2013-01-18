@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+import sys
+import os
+import re
+import json
+
+
+def do_export():
+    """
+    Create an export file from the curret directory
+    """
+    data = []
+
+    # Recurse through git repos
+    for root, directories, files in os.walk(os.getcwd()):
+        # Skip directories that aren't git roots
+        if not os.path.isdir(root + '/.git'):
+            continue
+
+        # Get the relative path of the repo
+        relpath = os.path.relpath(root, os.getcwd())
+        print "Entering '%s'" % relpath
+
+        # Find remote
+        origin_data = os.popen('cd %s && git remote show origin' % root).read()
+        remote_url = re.search(r'Fetch URL: (\S+)', origin_data).group(1)
+
+        data.append({'path': root, 'remote': remote_url})
+
+    manifest = open('gitmanifest.json', 'w')
+    manifest.write(json.dumps(data, indent=4))
+
+
+def do_import():
+    """
+    Parse an export file and import its repos
+    """
+    # Make sure there's an arg available
+    if len(sys.argv) < 2:
+        return False
+
+    # Open the import file
+    import_file = sys.argv[1]
+    repos = json.load(open(import_file))
+
+    # Try to import each repo
+    for repo in repos:
+        # Skip the repo with a message if the directory already exists
+        if os.path.exists(repo['path']):
+            print 'Skipping %s because %s already exists' % (repo['remote'], repo['path'])
+            continue
+
+        # Clone the repo to its directory
+        print os.popen('git clone %s %s' % (repo['remote'], repo['path'])).read()
+
+
+if __name__ == '__main__':
+    do_import() if len(sys.argv) > 1 else do_export()
